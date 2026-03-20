@@ -14,29 +14,12 @@ async function main() {
 
   const token = login.data.access_token;
 
-  // Essayer différents formats de token
-  console.log('\nEssai 1 - Authorization Bearer...');
-  try {
-    const r1 = await axios.get(`${WEBUI}/api/subscriber`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    console.log('OK :', r1.data);
-  } catch(e) { console.log('Echec :', e.response.data); }
-
-  console.log('\nEssai 2 - Token header...');
+  console.log('\nRecupération - Token');
   try {
     const r2 = await axios.get(`${WEBUI}/api/subscriber`, {
       headers: { 'Token': token }
     });
     console.log('OK :', r2.data);
-  } catch(e) { console.log('Echec :', e.response.data); }
-
-  console.log('\nEssai 3 - Cookie...');
-  try {
-    const r3 = await axios.get(`${WEBUI}/api/subscriber`, {
-      headers: { 'Cookie': `token=${token}` }
-    });
-    console.log('OK :', r3.data);
   } catch(e) { console.log('Echec :', e.response.data); }
 }
 
