@@ -3,25 +3,43 @@ const axios = require('axios');
 const WEBUI = 'http://localhost:5000';
 
 async function main() {
-  // 1. Login
-  console.log('Connexion au WebUI free5GC...');
+  // Login
   const login = await axios.post(`${WEBUI}/api/login`, {
     username: 'admin',
     password: 'free5gc'
   });
 
+  console.log('Réponse login complète :', JSON.stringify(login.data, null, 2));
+  console.log('Headers réponse :', JSON.stringify(login.headers, null, 2));
+
   const token = login.data.access_token;
-  console.log('Token OK :', token.substring(0, 30) + '...');
 
-  // 2. Lister les abonnés
-  console.log('\nRécupération des abonnés...');
-  const subscribers = await axios.get(`${WEBUI}/api/subscriber`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  // Essayer différents formats de token
+  console.log('\nEssai 1 - Authorization Bearer...');
+  try {
+    const r1 = await axios.get(`${WEBUI}/api/subscriber`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    console.log('OK :', r1.data);
+  } catch(e) { console.log('Echec :', e.response.data); }
 
-  console.log('Abonnés trouvés :', JSON.stringify(subscribers.data, null, 2));
+  console.log('\nEssai 2 - Token header...');
+  try {
+    const r2 = await axios.get(`${WEBUI}/api/subscriber`, {
+      headers: { 'Token': token }
+    });
+    console.log('OK :', r2.data);
+  } catch(e) { console.log('Echec :', e.response.data); }
+
+  console.log('\nEssai 3 - Cookie...');
+  try {
+    const r3 = await axios.get(`${WEBUI}/api/subscriber`, {
+      headers: { 'Cookie': `token=${token}` }
+    });
+    console.log('OK :', r3.data);
+  } catch(e) { console.log('Echec :', e.response.data); }
 }
 
 main().catch(err => {
-  console.error('Erreur :', err.response?.data || err.message);
+  console.error('Erreur globale :', err.message);
 });
