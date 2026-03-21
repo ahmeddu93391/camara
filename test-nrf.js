@@ -1,8 +1,12 @@
 const axios = require('axios');
+
 const NRF = 'http://10.100.200.4:8000';
 const UDM = 'http://10.100.200.8:8000';
 const AMF = 'http://10.100.200.16:8000';
 const UDR = 'http://10.100.200.12:8000';
+const NEF_ID = '9dea0e89-3b26-4b74-9159-5a01ffce1127';
+const AF_ID  = '06738def-a5b1-4948-a1aa-93650d8ddf82';
+const SUPI   = 'imsi-208930000000001';
 
 async function getToken(nfType, targetNfType, scope, nfInstanceId) {
   const r = await axios.post(
@@ -21,47 +25,58 @@ async function getToken(nfType, targetNfType, scope, nfInstanceId) {
 }
 
 async function main() {
-  const NEF_ID = '9dea0e89-3b26-4b74-9159-5a01ffce1127';
-  const AF_ID  = '06738def-a5b1-4948-a1aa-93650d8ddf82';
 
-  // Test 1 — Appeler l'UDM pour les données d'un abonné
-  console.log('\n=== Test UDM ===');
+  // Test 1 — UDM v2 — données abonné
+  console.log('\n=== Test UDM v2 ===');
   try {
-    const tokenUDM = await getToken('NEF', 'UDM', 'nudm-sdm', NEF_ID);
+    const token = await getToken('NEF', 'UDM', 'nudm-sdm', NEF_ID);
     const r = await axios.get(
-      `${UDM}/nudm-sdm/v1/imsi-208930000000001/nssai`,
-      { headers: { Authorization: `Bearer ${tokenUDM}` } }
+      `${UDM}/nudm-sdm/v2/${SUPI}/nssai?plmn-id={"mcc":"208","mnc":"93"}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     console.log('UDM répond :', r.data);
   } catch(e) {
     console.log('UDM erreur :', e.response ? e.response.data : e.message);
   }
 
-  // Test 2 — Appeler l'UDR pour l'historique SIM
-  console.log('\n=== Test UDR ===');
+  // Test 2 — UDR v2 — historique SIM
+  console.log('\n=== Test UDR v2 ===');
   try {
-    const tokenUDR = await getToken('NEF', 'UDR', 'nudr-dr', NEF_ID);
+    const token = await getToken('NEF', 'UDR', 'nudr-dr', NEF_ID);
     const r = await axios.get(
-      `${UDR}/nudr-dr/v1/subscription-data/imsi-208930000000001/authentication-data`,
-      { headers: { Authorization: `Bearer ${tokenUDR}` } }
+      `${UDR}/nudr-dr/v2/subscription-data/${SUPI}/authentication-data/authentication-subscription`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log('UDR répond :', r.data);
+    console.log('UDR répond :', JSON.stringify(r.data).substring(0, 200));
   } catch(e) {
     console.log('UDR erreur :', e.response ? e.response.data : e.message);
   }
-// Test 3 — Appeler l'AMF pour le statut terminal
-  console.log('\n=== Test AMF ===');
+
+  // Test 3 — AMF OAM — terminaux connectés
+  console.log('\n=== Test AMF OAM ===');
   try {
-    const tokenAMF = await getToken('AF', 'AMF', 'namf-comm', AF_ID);
+    const token = await getToken('AF', 'AMF', 'namf-oam', AF_ID);
     const r = await axios.get(
-      `${AMF}/namf-comm/v1/ue-contexts/imsi-208930000000001`,
-      { headers: { Authorization: `Bearer ${tokenAMF}` } }
+      `${AMF}/namf-oam/v1/registered-ue-context`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log('AMF répond :', r.data);
+    console.log('AMF répond :', JSON.stringify(r.data).substring(0, 200));
   } catch(e) {
     console.log('AMF erreur :', e.response ? e.response.data : e.message);
+  }
+
+  // Test 4 — UDR provisioned data
+  console.log('\n=== Test UDR provisioned data ===');
+  try {
+    const token = await getToken('NEF', 'UDR', 'nudr-dr', NEF_ID);
+    const r = await axios.get(
+      `${UDR}/nudr-dr/v2/subscription-data/${SUPI}/20893/provisioned-data/am-data?supported-features=`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    console.log('UDR provisioned répond :', JSON.stringify(r.data).substring(0, 200));
+  } catch(e) {
+    console.log('UDR provisioned erreur :', e.response ? e.response.data : e.message);
   }
 }
 
 main().catch(e => console.error('Erreur globale :', e.message));
-  
