@@ -33,9 +33,18 @@ function authMiddleware(req, res, next) {
   catch { res.status(401).json({ error: 'invalid_token' }); }
 }
 
+// WebUI
+app.use('/webui/sim-swap',                   authMiddleware, require('./routes/simSwapWebui'));
+app.use('/webui/device-reachability-status', authMiddleware, require('./routes/deviceStatusWebui'));
+app.use('/webui/location-verification',      authMiddleware, require('./routes/locationWebui'));
+
+// APIs internes free5GC
 app.use('/sim-swap',                   authMiddleware, require('./routes/simSwap'));
 app.use('/device-reachability-status', authMiddleware, require('./routes/deviceStatus'));
-app.use('/quality-on-demand',          authMiddleware, require('./routes/qod'));
 app.use('/location-verification',      authMiddleware, require('./routes/location'));
+app.use('/location-retrieval',         authMiddleware, require('./routes/location'));
+
+// QoD
+app.use('/quality-on-demand', authMiddleware, require('./routes/qod'));
 
 app.listen(3000, () => console.log('[CAMARA Mock] Port 3000'));
