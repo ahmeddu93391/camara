@@ -8,10 +8,17 @@ async function main() {
   );
   const headers = { Authorization: `Bearer ${r.data.access_token}`, 'Content-Type': 'application/json' };
 
-  const res = await axios.post(`${BASE}/sim-swap/v0/check`,
+  // WebUI
+  const res0 = await axios.post(`${BASE}/webui/sim-swap/v0/check`,
     { phoneNumber: '0900000000', maxAge: 24 }, { headers }
   );
-  console.log('SIM Swap :', res.data);
+  console.log('SIM Swap WebUI :', res0.data);
+
+  // APIs internes
+  const res1 = await axios.post(`${BASE}/sim-swap/v1/check`,
+    { phoneNumber: '0900000000', maxAge: 24 }, { headers }
+  );
+  console.log('SIM Swap APIs internes :', res1.data);
 }
 
 main().catch(e => console.error('Erreur :', e.response ? e.response.data : e.message));
