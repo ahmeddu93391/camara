@@ -26,8 +26,8 @@ async function getToken(nfType, targetNfType, scope, nfInstanceId) {
 
 async function main() {
 
-  // Test 1 — UDM v2 — données abonné
-  console.log('\n=== Test UDM v2 ===');
+  // Test 1 - UDM - données abonné
+  console.log('\n=== Test UDM ===');
   try {
     const token = await getToken('NEF', 'UDM', 'nudm-sdm', NEF_ID);
     const r = await axios.get(
@@ -39,8 +39,8 @@ async function main() {
     console.log('UDM erreur :', e.response ? e.response.data : e.message);
   }
 
-  // Test 2 — UDR v2 — historique SIM
-  console.log('\n=== Test UDR v2 ===');
+  // Test 2 - UDR - historique SIM
+  console.log('\n=== Test UDR ===');
   try {
     const token = await getToken('NEF', 'UDR', 'nudr-dr', NEF_ID);
     const r = await axios.get(
@@ -52,7 +52,7 @@ async function main() {
     console.log('UDR erreur :', e.response ? e.response.data : e.message);
   }
 
-  // Test 3 — AMF OAM — terminaux connectés
+  // Test 3 - AMF OAM - terminaux connectés
   console.log('\n=== Test AMF OAM ===');
   try {
     const token = await getToken('AF', 'AMF', 'namf-oam', AF_ID);
@@ -65,7 +65,7 @@ async function main() {
     console.log('AMF erreur :', e.response ? e.response.data : e.message);
   }
 
-  // Test 4 — UDR provisioned data
+  // Test 4 - UDR provisioned data
   console.log('\n=== Test UDR provisioned data ===');
   try {
     const token = await getToken('NEF', 'UDR', 'nudr-dr', NEF_ID);
