@@ -1,43 +1,31 @@
 const { exec } = require("child_process");
+const path = require("path");
 
-const subscribers = [
-  { supi: "imsi-208930000000002", msisdn: "0900000002" },
-  { supi: "imsi-208930000000003", msisdn: "0900000003" },
-  { supi: "imsi-208930000000004", msisdn: "0900000004" },
-  { supi: "imsi-208930000000005", msisdn: "0900000005" }
+const CONFIG_DIR = "/opt/camara/config";
+const IMAGE = "free5gc/ueransim:latest";
+const NR_UE = "/ueransim/nr-ue";
+
+const UE_IDS = [
+  "208930000000002",
+  "208930000000003",
+  "208930000000004",
+  "208930000000005"
 ];
 
-const AMF_IP = "10.100.200.16"; // Ton AMF
-const RAN_TYPE = "gNB";
+UE_IDS.forEach((UE) => {
+  const yamlFile = path.join(CONFIG_DIR, `ue-${UE}.yaml`);
+  console.log(`Lancement UE ${UE} ...`);
 
-async function creerAbonne(supi, msisdn) {
-  return new Promise((resolve) => {
-    console.log(`Lancement UE ${msisdn} (${supi}) ...`);
+  const cmd = `docker run --rm --net=host -v ${CONFIG_DIR}:/ueransim/config ${IMAGE} ${NR_UE} -c ${yamlFile}`;
 
-    const cmd = `docker run --rm --net=host free5gc/ueransim:latest /ueransim/nr-ue \
-      --supi ${supi} \
-      --msisdn ${msisdn} \
-      --amf-ip ${AMF_IP} \
-      --ran-type ${RAN_TYPE}`;
-
-    const child = exec(cmd, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Erreur UE ${msisdn}: ${error.message}`);
-      } else {
-        console.log(`UE ${msisdn} lancé avec succès !`);
-      }
-      resolve();
-    });
-
-    // Pour voir la sortie en direct (optionnel)
-    child.stdout.pipe(process.stdout);
-    child.stderr.pipe(process.stderr);
+  const proc = exec(cmd, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Erreur UE ${UE}: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`stderr UE ${UE}: ${stderr}`);
+    }
+    console.log(`stdout UE ${UE}: ${stdout}`);
   });
-}
-
-(async () => {
-  for (const sub of subscribers) {
-    await creerAbonne(sub.supi, sub.msisdn);
-  }
-  console.log("Tous les UEs sont lancés et devraient être attachés à l’AMF !");
-})();
+});
