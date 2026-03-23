@@ -56,32 +56,22 @@ def obtenir_supi_depuis_numero(numero):
     return None
 
 def obtenir_5qi_depuis_reseau(numero):
-    try:
-        supi  = obtenir_supi_depuis_numero(numero)
-        if not supi:
-            return {"5qi": 9, "profil": "QOS_M", "description": "Navigation web (défaut)"}
-
-        token = obtenir_token_nrf("UDR", "nudr-dr")
-        r = requests.get(
-            f"{UDR}/nudr-dr/v2/subscription-data/{supi}/20893/provisioned-data/sm-data",
-            headers={"Authorization": "Bearer " + token}
-        )
-
-        if r.status_code == 200:
-            data = r.json()
-            # Chercher le 5QI dans les données de session
-            if isinstance(data, list) and len(data) > 0:
-                dnn_configs = data[0].get("dnnConfigurations", {})
-                internet    = dnn_configs.get("internet", {})
-                fiveQI      = internet.get("5gQosProfile", {}).get("5qi", 9)
-                info        = CORRESPONDANCE_5QI.get(fiveQI, {"profil": "QOS_M", "description": "Inconnu"})
-                return {"5qi": fiveQI, "profil": info["profil"], "description": info["description"]}
-
-    except Exception as e:
-        print(f"    Erreur lecture 5QI : {e}")
-
+    token = obtenir_token_camara()
+    r = requests.get(
+        CAMARA + "/quality-on-demand/v1/profiles/" + numero,
+        headers={"Authorization": "Bearer " + token}
+    )
+    if r.status_code == 200:
+        data   = r.json()
+        fiveQI = data.get("5qi", 9)
+        info   = CORRESPONDANCE_5QI.get(fiveQI, {"profil": "QOS_M", "description": "Inconnu"})
+        return {
+            "5qi": fiveQI,
+            "profil": info["profil"],
+            "description": info["description"]
+        }
     return {"5qi": 9, "profil": "QOS_M", "description": "Navigation web (défaut)"}
-
+    
 def verifier_statut_terminal(numero):
     token = obtenir_token_camara()
     r = requests.post(
