@@ -47,18 +47,17 @@ router.get('/v1/profiles/:phoneNumber', async (req, res) => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    if (r.data && Array.isArray(r.data) && r.data.length > 0) {
-      const dnnConfigs = r.data[0].dnnConfigurations || {};
-      const internet   = dnnConfigs.internet || {};
-      const fiveQI     = internet['5gQosProfile']?.['5qi'] || 9;
-      return res.json({ phoneNumber, supi, '5qi': fiveQI });
-    }
+    const individualSmData = r.data.individualSmSubsData || [];
+    const first = individualSmData[0] || {};
+    const dnnConfigs = first.dnnConfigurations || {};
+    const internet   = dnnConfigs.internet || {};
+    const fiveQI     = internet['5gQosProfile']?.['5qi'] || 9;
 
-    res.json({ phoneNumber, supi, '5qi': 9 });
+    return res.json({ phoneNumber, supi, '5qi': fiveQI });
 
   } catch(e) {
     console.error('[QoD Profiles] Erreur :', e.message);
-    res.json({ phoneNumber, '5qi': 9 });
+    return res.json({ phoneNumber, '5qi': 9 });
   }
 });
 
@@ -90,6 +89,7 @@ router.post('/v1/sessions/:sessionId/extend', (req, res) => {
   session.expiresAt = new Date(new Date(session.expiresAt).getTime() + extra * 1000).toISOString();
   res.json(session);
 });
+
 
 router.get('/v1/sessions/:sessionId', (req, res) => {
   const session = sessions[req.params.sessionId];
