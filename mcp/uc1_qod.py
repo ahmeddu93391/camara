@@ -45,7 +45,6 @@ def verifier_statut_terminal(numero):
     return r.json()
     # Retourne : { reachabilityStatus, source, supi, cmState, checkedAt }
 
-# ── Étape 2 : Profil 5QI via CAMARA ───────────────────────────
 
 def obtenir_5qi_depuis_camara(numero):
     token = obtenir_token_camara()
@@ -245,11 +244,11 @@ def executer_uc1(numero):
 
 if __name__ == "__main__":
     terminaux = [
-        "0900000001",  # 5QI=1 → QOS_E
-        "0900000002",  # 5QI=2 → QOS_E
-        "0900000003",  # 5QI=4 → QOS_L
-        "0900000004",  # 5QI=9 → QOS_M
-        "0900000005",  # 5QI=8 → QOS_S
+        "0900000001",  
+        "0900000002",  
+        "0900000003",  
+        "0900000004",  
+        "0900000005", 
     ]
 
     resultats = []
