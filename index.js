@@ -1,4 +1,5 @@
 const express = require('express');
+const camaraRouter = require('./routes/'); 
 const jwt = require('jsonwebtoken');
 const app = express();
 app.use(express.json());
@@ -46,5 +47,5 @@ app.use('/location-retrieval',         authMiddleware, require('./routes/locatio
 
 // QoD
 app.use('/quality-on-demand', authMiddleware, require('./routes/qod'));
-
+app.use('/v1', camaraRouter);
 app.listen(3000, () => console.log('[CAMARA] Port 3000'));
