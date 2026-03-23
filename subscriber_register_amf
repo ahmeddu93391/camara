@@ -13,7 +13,7 @@ const AMF_IP = '10.100.200.16';
 
 function lancerUE(ue) {
   return new Promise((resolve, reject) => {
-    const cmd = `docker run --rm --net=host ueransim/ue:latest \
+    const cmd = `docker run --rm --net=host free5gc/ueransim:latest \
       --supi ${ue.supi} \
       --msisdn ${ue.msisdn} \
       --amf-ip ${AMF_IP} \
