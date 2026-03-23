@@ -1,0 +1,50 @@
+const { exec } = require('child_process');
+
+const abonnés = [
+  { supi: 'imsi-208930000000001', msisdn: '0900000001', description: 'Visioconférence médicale (QOS_E)' },
+  { supi: 'imsi-208930000000002', msisdn: '0900000002', description: 'Vidéo temps réel (QOS_E)' },
+  { supi: 'imsi-208930000000003', msisdn: '0900000003', description: 'Jeu en ligne (QOS_L)' },
+  { supi: 'imsi-208930000000004', msisdn: '0900000004', description: 'Navigation web (QOS_M)' },
+  { supi: 'imsi-208930000000005', msisdn: '0900000005', description: 'Téléchargement (QOS_S)' },
+];
+
+
+const AMF_IP = '10.100.200.16';
+
+function lancerUE(ue) {
+  return new Promise((resolve, reject) => {
+    const cmd = `docker run --rm --net=host ueransim/ue:latest \
+      --supi ${ue.supi} \
+      --msisdn ${ue.msisdn} \
+      --amf-ip ${AMF_IP} \
+      --ran-type gNB`;
+    
+    console.log(`Lancement UE ${ue.msisdn} (${ue.supi}) ...`);
+    
+    const process = exec(cmd, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Erreur UE ${ue.msisdn}:`, error.message);
+        reject(error);
+      } else {
+        console.log(`UE ${ue.msisdn} lancé.`);
+        resolve(stdout);
+      }
+    });
+
+    process.stdout.on('data', data => console.log(data.toString()));
+    process.stderr.on('data', data => console.error(data.toString()));
+  });
+}
+
+async function main() {
+  for (const ue of abonnés) {
+    try {
+      await lancerUE(ue);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  console.log('Tous les UEs sont lancés et devraient être attachés à l’AMF !');
+}
+
+main();
