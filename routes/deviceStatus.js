@@ -23,9 +23,9 @@ async function getNRFToken(nfType, targetNfType, scope, instanceId) {
   return r.data.access_token;
 }
 
-function phoneToSupi(phone) {
-  const digits = phone.replace(/\D/g, '').slice(-9);
-  return `imsi-20893${digits.padStart(10, '0')}`;
+function phoneToGpsi(phone) {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  return `msisdn-${digits}`;
 }
 
 router.post('/v1/retrieve', async (req, res) => {
