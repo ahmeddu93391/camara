@@ -240,9 +240,9 @@ def executer_uc1(numero):
     print(f"Profil QoS : {decision.get('profilQos')}")
     print(f"Latence    : {latence}ms (objectif < 500ms)")
     if latence < 500:
-        print("Performance : ✓ OK")
+        print("Performance : OK")
     else:
-        print("Performance : ✗ Trop lent")
+        print("Performance : Trop lent")
 
     # Étape 5 - Suppression session
     if session and session.get('sessionId'):
