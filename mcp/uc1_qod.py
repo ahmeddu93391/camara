@@ -224,7 +224,7 @@ def executer_uc1(numero):
     print(f"Décision   : {decision.get('decision')}")
     print(f"Profil QoS : {decision.get('profilQos')}")
     print(f"Latence    : {latence}ms (objectif < 500ms)")
-    print(f"Performance: {'✓ OK' if latence < 500 else '✗ Trop lent'}")
+    print(f"Performance: {'OK' if latence < 500 else 'Trop lent'}")
 
     if session and session.get('sessionId'):
         print("\n[5] Suppression session QoS via CAMARA...")
