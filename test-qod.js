@@ -1,102 +1,116 @@
 const axios = require('axios');
 
-const BASE = 'http://localhost:3000'; // CAMARA
-const TERMINAUX = [
-  "0900000001",
-  "0900000002",
-  "0900000003",
-  "0900000004",
-  "0900000005",
-];
+const CAMARA = 'http://localhost:3000';
+const NRF    = 'http://10.100.200.4:8000';
+const UDM    = 'http://10.100.200.8:8000';
+const UDR    = 'http://10.100.200.12:8000';
+const NEF_ID = '9dea0e89-3b26-4b74-9159-5a01ffce1127';
+
+const CORRESPONDANCE_5QI = {
+  1: { profil: 'QOS_E', description: 'Voix temps réel' },
+  2: { profil: 'QOS_E', description: 'Vidéo temps réel' },
+  3: { profil: 'QOS_E', description: 'Jeu temps réel' },
+  4: { profil: 'QOS_L', description: 'Jeu en ligne' },
+  5: { profil: 'QOS_L', description: 'IMS signalisation' },
+  6: { profil: 'QOS_L', description: 'Streaming live' },
+  7: { profil: 'QOS_L', description: 'Voix interactive' },
+  8: { profil: 'QOS_S', description: 'Téléchargement' },
+  9: { profil: 'QOS_M', description: 'Navigation web' },
+};
 
 async function obtenirTokenCamara() {
-  const r = await axios.post(`${BASE}/oauth/token`,
+  const r = await axios.post(`${CAMARA}/oauth/token`,
     'grant_type=client_credentials&client_id=test&client_secret=test',
     { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
   );
   return r.data.access_token;
 }
 
-async function obtenirProfil(numero, token) {
-  const res = await axios.get(`${BASE}/v1/profiles/${numero}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  // renvoie { phoneNumber, supi, 5qi, profil }
-  return res.data;
+async function obtenirTokenNrf(targetNfType, scope) {
+  const r = await axios.post(`${NRF}/oauth2/token`,
+    `grant_type=client_credentials&nfInstanceId=${NEF_ID}&nfType=NEF&targetNfType=${targetNfType}&scope=${scope}&requesterPlmn={"mcc":"208","mnc":"93"}`,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  return r.data.access_token;
 }
 
-async function creerSessionQos(numero, profil, token, duree = 3600) {
-  const res = await axios.post(`${BASE}/quality-on-demand/v1/sessions`,
+async function obtenirSupi(numero) {
+  const token = await obtenirTokenNrf('UDM', 'nudm-sdm');
+  const r = await axios.get(`${UDM}/nudm-sdm/v2/msisdn-${numero}/id-translation-result`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return r.data.supi;
+}
+
+async function obtenir5Qi(numero) {
+  try {
+    const supi = await obtenirSupi(numero);
+    if (!supi) return { fiveQi: 9, profil: 'QOS_M', description: 'Navigation web (défaut)' };
+
+    const token = await obtenirTokenNrf('UDR', 'nudr-dr');
+    const r = await axios.get(`${UDR}/nudr-dr/v2/subscription-data/${supi}/20893/provisioned-data/sm-data`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (r.status === 200 && Array.isArray(r.data) && r.data.length > 0) {
+      const dnn = r.data[0].dnnConfigurations?.internet?.['5gQosProfile'];
+      const fiveQi = dnn?.['5qi'] || 9;
+      const info = CORRESPONDANCE_5QI[fiveQi] || { profil: 'QOS_M', description: 'Inconnu' };
+      return { fiveQi, profil: info.profil, description: info.description };
+    }
+  } catch (e) {
+    console.error('Erreur lecture 5QI :', e.message);
+  }
+  return { fiveQi: 9, profil: 'QOS_M', description: 'Navigation web (défaut)' };
+}
+
+async function creerSessionQos(numero, profil, duree = 3600) {
+  const token = await obtenirTokenCamara();
+  const r = await axios.post(`${CAMARA}/quality-on-demand/v1/sessions`,
     { device: { phoneNumber: numero }, qosProfile: profil, duration: duree },
     { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
   );
-  return res.data;
+  return r.data;
 }
 
-async function verifierSession(sessionId, token) {
-  const res = await axios.get(`${BASE}/quality-on-demand/v1/sessions/${sessionId}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data;
+async function supprimerSessionQos(sessionId) {
+  const token = await obtenirTokenCamara();
+  const r = await axios.delete(`${CAMARA}/quality-on-demand/v1/sessions/${sessionId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return r.status;
 }
 
-async function supprimerSession(sessionId, token) {
-  const res = await axios.delete(`${BASE}/quality-on-demand/v1/sessions/${sessionId}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.status;
-}
 
 async function executerUC1(numero) {
-  console.log("\n" + "=".repeat(60));
-  console.log(`UC1 - Boost de Connectivité Intelligent\nTerminal : ${numero}`);
-  console.log("=".repeat(60));
+  console.log(`\n============================================================`);
+  console.log(`UC1 - Boost de Connectivité Intelligent`);
+  console.log(`Terminal : ${numero}`);
+  console.log(`============================================================`);
 
-  const debut = Date.now();
-  const token = await obtenirTokenCamara();
+  const profil = await obtenir5Qi(numero);
+  console.log(`[1] Profil CAMARA : 5QI=${profil.fiveQi} | Profil QoS=${profil.profil}`);
 
-  let profil;
-  try {
-    profil = await obtenirProfil(numero, token);
-    console.log(`[1] Profil CAMARA : 5QI=${profil['5qi']} | Profil QoS=${profil['profil']} | SUPI=${profil['supi']}`);
-  } catch (e) {
-    console.log(`[Erreur] Impossible de récupérer le profil CAMARA pour ${numero}, utilisation par défaut`);
-    profil = { '5qi': 9, 'profil': 'QOS_M' };
-  }
+  const session = await creerSessionQos(numero, profil.profil);
+  console.log(`[2] Session QoS créée : ID=${session.sessionId}, Statut=${session.status}, Expiration=${session.expiresAt}`);
 
-  let session;
-  try {
-    session = await creerSessionQos(numero, profil.profil, token);
-    console.log(`[2] Session QoS créée : ID=${session.sessionId}, Statut=${session.status}, Expiration=${session.expiresAt}`);
-  } catch (e) {
-    console.error(`[Erreur] Création session QoS :`, e.response ? e.response.data : e.message);
-    return;
-  }
+  const sessionVerif = await axios.get(`${CAMARA}/quality-on-demand/v1/sessions/${session.sessionId}`,
+    { headers: { Authorization: `Bearer ${await obtenirTokenCamara()}` } }
+  );
+  console.log(`[3] Session vérifiée :`, sessionVerif.data);
 
+  const codeSupp = await supprimerSessionQos(session.sessionId);
+  console.log(`[4] Session supprimée : HTTP ${codeSupp}`);
 
-  try {
-    const verification = await verifierSession(session.sessionId, token);
-    console.log(`[3] Session vérifiée :`, verification);
-  } catch (e) {
-    console.error(`[Erreur] Vérification session :`, e.response ? e.response.data : e.message);
-  }
-
-  try {
-    const code = await supprimerSession(session.sessionId, token);
-    console.log(`[4] Session supprimée : HTTP ${code}`);
-  } catch (e) {
-    console.error(`[Erreur] Suppression session :`, e.response ? e.response.data : e.message);
-  }
-
-  const latence = Date.now() - debut;
-  console.log("\n" + "=".repeat(60));
-  console.log(`RÉSULTAT FINAL : Décision ACTIVER, Profil QoS=${profil.profil}, Latence=${latence}ms`);
-  console.log("=" .repeat(60));
+  console.log(`\n============================================================`);
+  console.log(`RÉSULTAT FINAL : Décision ACTIVER, Profil QoS=${profil.profil}`);
+  console.log(`============================================================`);
 }
 
+
 (async () => {
-  for (const numero of TERMINAUX) {
+  const terminaux = ['0900000001','0900000002','0900000003','0900000004','0900000005'];
+  for (const numero of terminaux) {
     await executerUC1(numero);
-    await new Promise(r => setTimeout(r, 1000)); // pause 1s
   }
 })();
