@@ -1,3 +1,5 @@
+const router  = require('express').Router();
+const { v4: uuid } = require('uuid');
 const axios  = require('axios');
 const NRF    = 'http://10.100.200.4:8000';
 const UDM    = 'http://10.100.200.8:8000';
