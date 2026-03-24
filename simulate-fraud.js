@@ -59,7 +59,6 @@ module.exports = SIM_SWAPS;
   console.log('  0900000003 → SIM normale        → LOW risk');
   console.log('  0900000004 → SIM swappée il y a 5h → HIGH risk');
   console.log('  0900000005 → SIM normale        → LOW risk');
-  console.log('\nN\'oublie pas de rebuilder le conteneur Docker !');
 }
 
 main().catch(e => console.error('Erreur :', e.response ? e.response.data : e.message));
