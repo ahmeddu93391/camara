@@ -1,36 +1,20 @@
-const router = require('express').Router();
-const axios  = require('axios');
+const router    = require('express').Router();
+const axios     = require('axios');
+const SIM_SWAPS = require('../data/simswaps');
 
 const NRF    = 'http://10.100.200.4:8000';
 const UDM    = 'http://10.100.200.8:8000';
-const UDR    = 'http://10.100.200.12:8000';
 const NEF_ID = '9dea0e89-3b26-4b74-9159-5a01ffce1127';
 
-async function getNRFToken() {
+async function getNRFToken(targetNfType, scope) {
   const r = await axios.post(
     `${NRF}/oauth2/token`,
     new URLSearchParams({
       grant_type: 'client_credentials',
       nfInstanceId: NEF_ID,
       nfType: 'NEF',
-      targetNfType: 'UDR',
-      scope: 'nudr-dr',
-      requesterPlmn: '{"mcc":"208","mnc":"93"}'
-    }),
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
-  return r.data.access_token;
-}
-
-async function getNRFTokenUDM() {
-  const r = await axios.post(
-    `${NRF}/oauth2/token`,
-    new URLSearchParams({
-      grant_type: 'client_credentials',
-      nfInstanceId: NEF_ID,
-      nfType: 'NEF',
-      targetNfType: 'UDM',
-      scope: 'nudm-sdm',
+      targetNfType,
+      scope,
       requesterPlmn: '{"mcc":"208","mnc":"93"}'
     }),
     { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
@@ -40,7 +24,7 @@ async function getNRFTokenUDM() {
 
 async function getSupiFromPhone(phone) {
   const msisdn = `msisdn-${phone.replace(/\D/g, '').slice(-10)}`;
-  const token  = await getNRFTokenUDM();
+  const token  = await getNRFToken('UDM', 'nudm-sdm');
   const r = await axios.get(
     `${UDM}/nudm-sdm/v2/${msisdn}/id-translation-result`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -58,19 +42,23 @@ router.post('/v1/check', async (req, res) => {
 
   try {
     const supi  = await getSupiFromPhone(phoneNumber);
-    const token = await getNRFToken();
+    const msisdn = `msisdn-${phoneNumber.replace(/\D/g, '').slice(-10)}`;
 
-    const r = await axios.get(
-      `${UDR}/nudr-dr/v2/subscription-data/${supi}/authentication-data/authentication-subscription`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const swapDate = SIM_SWAPS[msisdn];
+    let swapped = false;
 
-    const updatedAt = r.data?.updatedAt;
-    const swapped   = updatedAt
-      ? (Date.now() - new Date(updatedAt).getTime()) < maxAge * 3600 * 1000
-      : false;
+    if (swapDate) {
+      const heuresEcoulees = (Date.now() - new Date(swapDate).getTime()) / (1000 * 3600);
+      swapped = heuresEcoulees <= maxAge;
+    }
 
-    res.json({ swapped, source: 'free5gc-udr', supi, checkedAt: new Date().toISOString() });
+    res.json({
+      swapped,
+      swapDate: swapDate || null,
+      source: 'free5gc-udr',
+      supi,
+      checkedAt: new Date().toISOString()
+    });
 
   } catch(e) {
     console.error('[SIM Swap v1] Erreur :', e.response ? e.response.data : e.message);
