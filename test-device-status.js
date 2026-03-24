@@ -8,13 +8,6 @@ async function main() {
   );
   const headers = { Authorization: `Bearer ${r.data.access_token}`, 'Content-Type': 'application/json' };
 
-  // WebUI
-  const res0 = await axios.post(`${BASE}/webui/device-reachability-status/v0/retrieve`,
-    { device: { phoneNumber: '0900000000' } }, { headers }
-  );
-  console.log('Device Status WebUI :', res0.data);
-
-  // APIs internes
   const res1 = await axios.post(`${BASE}/device-reachability-status/v1/retrieve`,
     { device: { phoneNumber: '0900000000' } }, { headers }
   );
