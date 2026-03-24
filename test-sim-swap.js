@@ -7,8 +7,6 @@ async function main() {
     { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
   );
   const headers = { Authorization: `Bearer ${r.data.access_token}`, 'Content-Type': 'application/json' };
-
-  // APIs
   const res1 = await axios.post(`${BASE}/sim-swap/v1/check`,
     { phoneNumber: '0900000000', maxAge: 24 }, { headers }
   );
