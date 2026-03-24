@@ -18,6 +18,7 @@ CORRESPONDANCE_5QI = {
     9: {"profil": "QOS_M", "description": "Navigation web"},
 }
 
+
 def obtenir_token_camara():
     r = requests.post(
         CAMARA + "/oauth/token",
@@ -27,8 +28,6 @@ def obtenir_token_camara():
     )
     r.raise_for_status()
     return r.json()["access_token"]
-
-
 
 def verifier_statut_terminal(numero):
     token = obtenir_token_camara()
@@ -43,8 +42,6 @@ def verifier_statut_terminal(numero):
     )
     r.raise_for_status()
     return r.json()
-    # Retourne : { reachabilityStatus, source, supi, cmState, checkedAt }
-
 
 def obtenir_5qi_depuis_camara(numero):
     token = obtenir_token_camara()
@@ -65,9 +62,35 @@ def obtenir_5qi_depuis_camara(numero):
             "source":      data.get("source", "camara")
         }
     except Exception as e:
-        print(f"Erreur lecture 5QI via CAMARA : {e}")
-        print(f" Profil par défaut appliqué (5QI=9 / QOS_M)")
+        print(f"    Erreur lecture 5QI : {e}")
         return {"5qi": 9, "profil": "QOS_M", "description": "Navigation web (défaut)", "source": "default"}
+
+def creer_session_qos(numero, profil, duree=3600):
+    token = obtenir_token_camara()
+    r = requests.post(
+        CAMARA + "/quality-on-demand/v1/sessions",
+        json={
+            "device":     {"phoneNumber": numero},
+            "qosProfile": profil,
+            "duration":   duree
+        },
+        headers={
+            "Authorization": "Bearer " + token,
+            "Content-Type":  "application/json"
+        },
+        timeout=10
+    )
+    r.raise_for_status()
+    return r.json()
+
+def supprimer_session_qos(session_id):
+    token = obtenir_token_camara()
+    r = requests.delete(
+        CAMARA + "/quality-on-demand/v1/sessions/" + session_id,
+        headers={"Authorization": "Bearer " + token},
+        timeout=10
+    )
+    return r.status_code
 
 def analyser_avec_llm(numero, statut, profil_reseau):
     prompt = f"""Je suis un agent IA de gestion de réseau télécom 5G.
@@ -103,89 +126,72 @@ Réponds UNIQUEMENT avec ce JSON exact, sans texte avant ou après :
         )
         return r.json()["response"]
     except Exception as e:
-        print(f"LLM inaccessible : {e}")
-        return ""
+        print(f"    LLM indisponible : {e}")
+        return None
 
 def analyser_reponse_llm(reponse, profil_reseau, statut):
     reachability = statut.get('reachabilityStatus', 'INCONNU')
 
-    # Fallback immédiat si terminal UNREACHABLE (règle absolue)
+    # Règle absolue — terminal UNREACHABLE = toujours REJETER
     if reachability == 'UNREACHABLE':
         return {
             "decision":  "REJETER",
             "profilQos": profil_reseau['profil'],
             "duree":     3600,
-            "raison":    "Terminal non joignable - rejet automatique"
+            "raison":    "Terminal non joignable — rejet automatique"
         }
 
-    # Parser la réponse LLM
+    if not reponse:
+        print("    LLM indisponible — aucune décision possible sans l'agent IA")
+        return {
+            "decision":  "EN_ATTENTE",
+            "profilQos": None,
+            "duree":     0,
+            "raison":    "LLM indisponible — décision suspendue"
+        }
+
     try:
         match = re.search(r'\{.*?\}', reponse, re.DOTALL)
         if match:
             data = json.loads(match.group())
-            # Toujours forcer le bon profil selon le 5QI
+            # Forcer le bon profil selon le 5QI
             data['profilQos'] = profil_reseau['profil']
 
-            # Sécurité : LLM ne peut pas rejeter un terminal REACHABLE
+            # LLM a dit REJETER pour un terminal REACHABLE — décision incohérente
             if reachability == 'REACHABLE' and data.get('decision') == 'REJETER':
-                print(f"    LLM a dit REJETER malgré REACHABLE → corrigé en ACTIVER")
-                data['decision'] = 'ACTIVER'
-                data['raison']   = f"Correction auto : terminal REACHABLE, profil {profil_reseau['profil']} appliqué"
+                print("    LLM a dit REJETER malgré REACHABLE — décision suspendue")
+                return {
+                    "decision":  "EN_ATTENTE",
+                    "profilQos": None,
+                    "duree":     0,
+                    "raison":    "Décision LLM incohérente — suspendue"
+                }
 
             return data
     except:
         pass
 
-    # Fallback règles directes si LLM KO ou JSON invalide
+    # JSON invalide — ne pas décider sans LLM
+    print("Réponse LLM invalide — décision suspendue")
     return {
-        "decision":  "ACTIVER",
-        "profilQos": profil_reseau['profil'],
-        "duree":     3600,
-        "raison":    f"Profil {profil_reseau['profil']} appliqué (5QI={profil_reseau['5qi']} - {profil_reseau['description']})"
+        "decision":  "EN_ATTENTE",
+        "profilQos": None,
+        "duree":     0,
+        "raison":  "Réponse LLM invalide — décision suspendue"
     }
 
-def creer_session_qos(numero, profil, duree=3600):
-
-    token = obtenir_token_camara()
-    r = requests.post(
-        CAMARA + "/quality-on-demand/v1/sessions",
-        json={
-            "device":      {"phoneNumber": numero},
-            "qosProfile":  profil,
-            "duration":    duree
-        },
-        headers={
-            "Authorization": "Bearer " + token,
-            "Content-Type":  "application/json"
-        },
-        timeout=10
-    )
-    r.raise_for_status()
-    return r.json()
-
-def supprimer_session_qos(session_id):
-    token = obtenir_token_camara()
-    r = requests.delete(
-        CAMARA + "/quality-on-demand/v1/sessions/" + session_id,
-        headers={"Authorization": "Bearer " + token},
-        timeout=10
-    )
-    return r.status_code
 
 def executer_uc1(numero):
     print("=" * 60)
-    print("UC1 - Boost de Connectivité Intelligent")
+    print("UC1 — Boost de Connectivité Intelligent")
     print(f"Terminal : {numero}")
     print("=" * 60)
-
     debut = time.time()
-
     print("\n[1] Vérification du terminal via CAMARA...")
     statut = verifier_statut_terminal(numero)
     print(f"    Statut  : {statut.get('reachabilityStatus')} ({statut.get('source')})")
     if statut.get('cmState'):
         print(f"    État CM : {statut.get('cmState')}")
-
 
     print("\n[2] Lecture du profil réseau via CAMARA...")
     profil_reseau = obtenir_5qi_depuis_camara(numero)
@@ -193,7 +199,7 @@ def executer_uc1(numero):
     print(f"    Type service: {profil_reseau['description']}")
     print(f"    Profil QoS  : {profil_reseau['profil']}")
     print(f"    Source      : {profil_reseau['source']}")
-
+    
     print("\n[3] Analyse par l'agent IA...")
     reponse_brute = analyser_avec_llm(numero, statut, profil_reseau)
     decision      = analyser_reponse_llm(reponse_brute, profil_reseau, statut)
@@ -213,8 +219,12 @@ def executer_uc1(numero):
         print(f"    Session ID : {session.get('sessionId')}")
         print(f"    Statut     : {session.get('status')}")
         print(f"    Expiration : {session.get('expiresAt')}")
-    else:
-        print("\n[4] QoS REJETÉE - terminal non joignable")
+
+    elif decision.get('decision') == 'REJETER':
+        print("\n[4] QoS REJETÉE — terminal non joignable")
+
+    elif decision.get('decision') == 'EN_ATTENTE':
+        print("\n[4] QoS EN ATTENTE — agent IA indisponible, aucune action effectuée")
 
     latence = int((time.time() - debut) * 1000)
 
@@ -222,10 +232,10 @@ def executer_uc1(numero):
     print("RÉSULTAT FINAL")
     print("=" * 60)
     print(f"Décision   : {decision.get('decision')}")
-    print(f"Profil QoS : {decision.get('profilQos')}")
+    print(f"Profil QoS : {decision.get('profilQos') or 'N/A'}")
     print(f"Latence    : {latence}ms (objectif < 500ms)")
     print(f"Performance: {'OK' if latence < 500 else 'Trop lent'}")
-
+    
     if session and session.get('sessionId'):
         print("\n[5] Suppression session QoS via CAMARA...")
         code = supprimer_session_qos(session['sessionId'])
@@ -244,11 +254,11 @@ def executer_uc1(numero):
 
 if __name__ == "__main__":
     terminaux = [
-        "0900000001",  
-        "0900000002",  
-        "0900000003",  
-        "0900000004",  
-        "0900000005", 
+        "0900000001",
+        "0900000002",
+        "0900000003",
+        "0900000004",
+        "0900000005",
     ]
 
     resultats = []
@@ -261,7 +271,8 @@ if __name__ == "__main__":
     print("\n\n" + "=" * 60)
     print("RÉSUMÉ DE LA SIMULATION")
     print("=" * 60)
-    print(f"{'Numéro':<15} {'5QI':>5} {'Service':<25} {'Profil':>8} {'Décision':>10}")
+    print(f"{'Numéro':<15} {'5QI':>5} {'Service':<25} {'Profil':>8} {'Décision':>12}")
     print("-" * 60)
     for r in resultats:
-        print(f"{r['numero']:<15} {r['5qi']:>5} {r['typeService']:<25} {r['profilQos']:>8} {r['decision']:>10}")
+        profil = r['profilQos'] if r['profilQos'] else 'N/A'
+        print(f"{r['numero']:<15} {r['5qi']:>5} {r['typeService']:<25} {profil:>8} {r['decision']:>12}")
