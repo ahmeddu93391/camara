@@ -45,7 +45,7 @@ async function main() {
     'msisdn-0900000004': new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
   };
 
-  const content = `// Registre des SIM Swaps — généré par simulate-fraud.js
+  const content = `Registre des SIM Swaps
    ${new Date().toISOString()}
 
 const SIM_SWAPS = ${JSON.stringify(simswaps, null, 2)};
